@@ -46,7 +46,6 @@ def oauth2(get_response):
             data = json.loads(
                 requests.post(acess_token_url.format(request.GET.get('code')), verify=False).text
             )
-            print(data)
             headers = {'Authorization': 'Bearer {}'.format(data.get('access_token')), 'x-api-key': CLIENT_SECRET}
             data = json.loads(
                 requests.post(USER_DATA_URL, data={'scope': data.get('scope')}, headers=headers).text
