@@ -1,0 +1,66 @@
+"""
+This module provides oAuth2 authentication
+
+Configuration steps:
+    a) Add this file in your app directory
+        - myapp
+          oauth.py
+
+    b) Configure settings.py
+        REDIRECT_URI = None
+        CLIENTE_ID = None
+        CLIENT_SECRET = None
+        AUTHORIZE_URL = None
+        ACCESS_TOKEN_URL = None
+        USER_DATA_URL = None
+
+    c) import it in views.py
+
+        from myapp.oauth import OAuth2Response
+        from django.http import HttpResponseRedirect
+
+        def myview(request):
+            oauth = OAuth2Response(request)
+            if oauth.data:
+                #  do something with the data
+                return HttpResponseRedirect('/admin/')
+            return oauth
+
+    d) Add a link in the HTML login page
+        <a href="/myapp/myview/">Login with Oauth2</>
+
+"""
+
+import json
+import requests
+from django.conf import settings
+from django.http import HttpResponse
+
+
+class OAuth2Response(HttpResponse):
+    def __init__(self, request, redirect_uri=None, client_id=None, client_secret=None, authorize_url=None, access_token_url=None, user_data_url=None):
+        redirect_uri = redirect_uri or settings.REDIRECT_URI
+        client_id = client_id or settings.CLIENTE_ID
+        client_secret = client_secret or settings.CLIENT_SECRET
+        authorize_url = authorize_url or settings.AUTHORIZE_URL
+        access_token_url = access_token_url or settings.ACCESS_TOKEN_URL
+        user_data_url = user_data_url or settings.USER_DATA_URL
+        authorize_url = '{}?response_type=code&client_id={}&redirect_uri={}'.format(
+            authorize_url, client_id, redirect_uri
+        )
+        access_token_request_data = dict(
+            grant_type='authorization_code',
+            code=request.GET.get('code'),
+            redirect_uri=redirect_uri,
+            client_id=client_id,
+            client_secret=client_secret
+        )
+        if 'code' in request.GET:
+            html = ''
+            data = json.loads(requests.post(access_token_url, data=access_token_request_data, verify=False).text)
+            headers = {'Authorization': 'Bearer {}'.format(data.get('access_token')), 'x-api-key': client_secret}
+            self.data = json.loads(requests.get(user_data_url, data={'scope': data.get('scope')}, headers=headers).text)
+        else:
+            self.data = None
+            html = '<html><script>document.location.href="{}";</script></html>'
+        super().__init__(html.format(authorize_url))
